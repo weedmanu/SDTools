@@ -40,6 +40,7 @@ zenity --info --title "SD tools" --width=400 --text "
     <span color=\"red\"><b><big>Vous pouvez débrancher la carte SD </big></b></span>
 
 " 2>/dev/null
+
 }
 
 # boite de dialogue intro
@@ -53,17 +54,17 @@ zenity --info --timeout=0 --title "SD tools" --width=400 --text "
 <span color=\"blue\">Puis valider</span>" 2>/dev/null
 
 # boite de dialogue qui demande le chemin du dossier où se trouve les images, vous pouvez changer le chemin par défaut  après --entry text
-CHEM=$(zenity --title "SD tools" --entry --width=400 --text "Chemin du dossier où se trouve les images de Raspbian " --entry-text "/home/manu/Documents/Raspi/" 2>/dev/null)
+CHEM=$(zenity --title "SD tools" --entry --width=400 --text "Chemin du dossier où se trouve les images de Raspbian " --entry-text "/home/manu/SDtools/" 2>/dev/null)
 exitstatus=$?
 if [ $exitstatus = 1 ]; then    
-    zenity --info --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null
+    zenity --error --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null
     exit
 fi
 cd ${CHEM}
 
 # on lit le dossier courant et on met la liste des fichiers .img  dans une variable
 i=0
-for j in $(find *.img )
+for j in $(find *.img *.iso )
 do 
   rep[$i]=$(basename $j)
   ((i++))
@@ -80,12 +81,24 @@ cle=`cut -c 13-15 /tmp/test.txt`
 # on supprime le fichier tampon ( pas nécessaire car dans /tmp)
 rm /tmp/test.txt
 
-# boite de dialogue qui affiche la liste des disques du pc et propose le dernier monté comme clé a utiliser
-zenity --info --timeout=0 --title "SD tools" --width=400 --text "
-<span color=\"blue\">Voici la liste des disques :  </span>  
-${tout}
-<span color=\"blue\">votre clé est :</span> <span color=\"green\">${cle}</span>
-<span color=\"red\">Sinon pas de panique, </span><span color=\"blue\">vous pouvez changer à l'étape suivante</span>" 2>/dev/null
+# on vérifie que c'est bien une cle USB en verifiant que la taille < 64 Giga
+taille=`fdisk -l /dev/${cle} | grep "Disque" | cut -d: -f2 | cut -d\( -f1 | cut -d, -f1`
+
+if [ $taille -lt 64 ]; then
+	# boite de dialogue qui affiche la liste des disques du pc et propose le dernier monté comme clé a utiliser
+	zenity --info --timeout=0 --title "SD tools" --width=400 --text "
+	<span color=\"blue\">Voici la liste des disques :  </span>  
+	${tout}
+	<span color=\"blue\">votre clé est :</span> <span color=\"green\">${cle}</span>
+	<span color=\"red\">Sinon pas de panique, </span><span color=\"blue\">vous pouvez changer à l'étape suivante</span>" 2>/dev/null	
+else 
+	# boite de dialogue pour prévenir que c'est pas une clé USB et sortir du programme
+	zenity --error --timeout=0 --title "SD tools" --width=400 --text "
+	<span color=\"blue\">Attention :  </span> 	
+	<span color=\"blue\">votre clé est un hdd:</span> <span color=\"green\">${cle}</span>
+	<span color=\"red\">Faite attention !!!</span>" 2>/dev/null
+	exit
+fi	
 
 # on détourne la sortie du shell dans un fichier sd.log pour pouvoir l'afficher dans une boite de dialogue 
 exec &> sd.log
@@ -98,7 +111,7 @@ if [ $exitstatus = 0 ]; then
     zenity --text-info --filename=sd.log --width=400 --height=300  --timeout=4 2>/dev/null  
     rm sd.log
 else
-    zenity --info --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null
+    zenity --error --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null
     rm sd.log
     exit
 fi
@@ -124,11 +137,12 @@ if (zenity --question --title "SD tools" --width=400 --text "Voulez-vous Install
         dd bs=4M if=${CHEM}${IMG} of=/dev/${SD} > >(zenity --title "SD tools" --progress --pulsate --text "Installation en cours patienter environ 5 à 10 minutes ..." --auto-close 2>/dev/null )      
         killeur
     else
-        zenity --info --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null                    
+        zenity --error --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null 
+        exit                   
     fi      
     zenity --text-info --width=400 --height=300 --timeout=4 --title='SD tools' --filename=instal-sauv.log 2>/dev/null
-    zenity --info --width=400 --title='SD tools' --text="Voilà c'est terminé" 2>/dev/null 
     rm instal-sauv.log
+    zenity --info --width=400 --title='SD tools' --text="Voilà c'est terminé" 2>/dev/null     
 else
     # si sauvegarde choisi , on demande d'entrer un nom pour l'image que l'on va créer
     # on créer la sauvegarde  ( clone ) quand c'est fini affiche le log
@@ -140,11 +154,12 @@ else
         dd bs=4M if=/dev/${SD} of=${CHEM}${NOM}.img > >(zenity --title "SD tools" --progress --pulsate --text "Sauvegarde en cours patienter environ 10 à 20 minutes ..." --auto-close 2>/dev/null )
         killeur
     else        
-        zenity --info --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null                    
+        zenity --error --title "SD tools" --width=400 --text "<span color=\"red\"><b><big>Vous avez annulé</big></b></span>" 2>/dev/null
+        exit                    
     fi      
     zenity --text-info --width=400 --height=300 --timeout=4 --title='SD tools' --filename=instal-sauv.log   
     rm instal-sauv.log
     zenity --info --width=400 --title='SD tools' --text="Voilà c'est terminé" 2>/dev/null 
 fi
+umount /dev/${SD}*
 exit 
-
