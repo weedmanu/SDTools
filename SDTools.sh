@@ -147,3 +147,4 @@ else
     zenity --info --width=400 --title='SD tools' --text="Voilà c'est terminé" 2>/dev/null 
 fi
 exit 
+
